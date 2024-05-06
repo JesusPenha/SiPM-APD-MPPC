@@ -6,4 +6,6 @@ Experiment: Compressed Baryonic Matter (CBM)\
 Bergische Universität Wuppertal\
 May, 2024
 
-![imagen](https://github.com/JesusPenha/SiPM-APD-MPPC/Graphical_abstract.png)
+![imagen](Graphical_abstract.png)
+
+
