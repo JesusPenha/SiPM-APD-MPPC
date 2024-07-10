@@ -10,9 +10,39 @@ import matplotlib.pylab as plt
 from scipy.optimize import curve_fit
 import matplotlib
 
+# DCR distribution
+
 def DCR_model(t, Tau):
     return np.exp(-t/Tau)
 
+
+# Afterpulse distribution
+
+np.random.seed(523)
+
+def AP_pdf(x, Tau_rec, Tau_AP):
+    
+
+    A = (Tau_rec + Tau_AP)/Tau_AP**2
+    
+    f_AP = A*(1- np.exp(-x/Tau_rec))*np.exp(-x/Tau_AP)
+    
+    return f_AP
+
+def AP_gen(n, Tau_rec, Tau_AP):
+    i = 0
+    output = np.zeros(n)
+    t = np.linspace(0,500,300)*1e-9
+    c = np.max(AP_pdf(t, Tau_rec, Tau_AP))
+    
+    while i < n:
+        U = np.random.uniform(size = 1)
+        V = 300e-9*np.random.uniform(size = 1)
+        if U < 1/c * AP_pdf(V, Tau_rec, Tau_AP):
+            output[i] = V
+            i = i + 1
+    return output
+    
 # Pulse shape simulation
 
 def Pulse(Rt, Ft, A, tm, R, plot=False):
@@ -51,14 +81,12 @@ def Pulse(Rt, Ft, A, tm, R, plot=False):
 
 # SiPM (Pixel) simulation
 
-def Pixel (Pulse_shape, DCR, Pixel_size, Cross,  After, W, R, sigma, plot=False): # DCR(Hz/mm2), pixel size(mm2), Crosstalk(%), Afterpulsing(%), recording window(ns)
-
+def Pixel (Pulse_shape, DCR, Pixel_size, Cross,  After, Tau_rec, Tau_AP, W, R,  sigma, plot=False): # DCR(Hz/mm2), pixel size(mm2), Crosstalk(%), Afterpulsing(%), recording window(ns)
+       
     N = len(Pulse_shape)
 
     DCR_pixel = DCR*Pixel_size
     Tau = 1/DCR_pixel
-    F_after = 100*DCR_pixel
-    Tau_after = 1/F_after
 
     # Noise generation
     
@@ -70,6 +98,9 @@ def Pixel (Pulse_shape, DCR, Pixel_size, Cross,  After, W, R, sigma, plot=False)
     DCR_Cross_After_pulses = np.zeros(L)
     index = 0
 
+
+
+    # Crosstalk
     alpha = 2.2 - 0.02*Cross*100
     
     while index < L-N:
@@ -106,15 +137,17 @@ def Pixel (Pulse_shape, DCR, Pixel_size, Cross,  After, W, R, sigma, plot=False)
             DCR_Cross_After_pulses[index:index+N] = DCR_Cross_After_pulses[index:index+N] + Pulse_shape*np.random.normal(1, sigma)
 
         if np.random.uniform() < After: # Afterpulse probability
-            C = 0
-            while C < 0.5: # Force the afterpulse amplitude to be greater than 0.5 spe
-                Rt_after = int(np.random.exponential(scale=Tau_after, size=None)*1e9/R)
-                C = 1-np.exp(-(Rt_after*R*1e-9)/Tau_after)
+            # C = 0
+            # while C > 0.5: # Force the afterpulse amplitude to be greater than 0.5 spe
+            # Rt_after = int(np.random.exponential(scale=Tau_AP, size=None)*1e9/R)
+            Rt_after = int(AP_gen(1, Tau_rec, Tau_AP)*1e9/R)
+            
+            C = 1-np.exp(-(Rt_after*R*1e-9)/Tau_rec)
             
             if index+Rt_after > L-N:
                 break
             After_impulses[index+Rt_after] = 1
-            DCR_Cross_After_pulses[index+Rt_after:index+Rt_after+N] = DCR_Cross_After_pulses[index+Rt_after:index+Rt_after+N] + C*np.random.normal(1, sigma)*Pulse_shape
+            DCR_Cross_After_pulses[index+Rt_after:index+Rt_after+N] = DCR_Cross_After_pulses[index+Rt_after:index+Rt_after+N] + np.random.normal(C, sigma)*Pulse_shape
 
     if plot == True:
         plt.figure(figsize=(18, 4))
@@ -127,13 +160,13 @@ def Pixel (Pulse_shape, DCR, Pixel_size, Cross,  After, W, R, sigma, plot=False)
 
 # MPPC noise simulation
 
-def MPPC(Pulse_shape, N_pixel, DCR, Pixel_size, Cross, After, W, R, sigma):
+def MPPC(Pulse_shape, N_pixel, DCR, Pixel_size, Cross, After, Tau_rec, Tau_AP, W, R, sigma):
     
     L = int(W/R)
     Channels = np.zeros((N_pixel,L))
 
     for i in range(N_pixel):
-        Channels[i,:], time = Pixel(Pulse_shape, DCR, Pixel_size, Cross, After, W, R, sigma)
+        Channels[i,:], time = Pixel(Pulse_shape, DCR, Pixel_size, Cross, After, Tau_rec, Tau_AP, W, R, sigma)
         
     return Channels, time
 
@@ -260,7 +293,7 @@ def DCR_threshold_data(Channel, W, R, Threshold, plot=False):
 
     return DCR_MPPC, Threshold
 
-def Camera_noise(Pulse_shape, N_pixel, Pixel_size, M, DCR, Cross, After, W, R, sigma, Nr, Nc, t0, Window, Th ):
+def Camera_noise(Pulse_shape, N_pixel, Pixel_size, M, DCR, Cross, After, Tau_rec, Tau_AP, W, R, sigma, Nr, Nc, t0, Window, Th ):
 
     Array_i = np.zeros((N_pixel,W))
     P = Nr*Nc # Number of MPPC (rows x columns)
@@ -280,7 +313,7 @@ def Camera_noise(Pulse_shape, N_pixel, Pixel_size, M, DCR, Cross, After, W, R, s
     fig = plt.figure(figsize=(A,A))
     
     for j in range(P):
-        Array_i, time = MPPC(Pulse_shape, N_pixel, DCR, Pixel_size, Cross, After, W, R, sigma)
+        Array_i, time = MPPC(Pulse_shape, N_pixel, DCR, Pixel_size, Cross, After, Tau_rec, Tau_AP, W, R, sigma)
 
         MPPC_i = np.zeros(N_pixel) 
 
@@ -367,11 +400,26 @@ def voting_trigger(signal, noise, M, Nr, Nc, L0_threshold, cmap='viridis'):
     Event =  signal.T + noise
 
     L0_trigger = np.zeros((Nr, Nc))
+    P_signal = 0
+    P_noise = 0
+    B_signal = 0
+    B_noise = 0
     
     for i in range(Nr):
         for j in range(Nc):
-            if np.sum(Event[i*M:i*M+M,j*M:j*M+M]) > L0_threshold:
+            if np.sum(Event[i*M:i*M+M,j*M:j*M+M]) >= L0_threshold:
                 L0_trigger[i,j] = 1
+            if np.sum(signal[i*M:i*M+M,j*M:j*M+M]) >= L0_threshold:
+                P_signal += 1
+            if np.sum(signal[i*M:i*M+M,j*M:j*M+M]) != 0:
+                B_signal += 1
+            if np.sum(noise[i*M:i*M+M,j*M:j*M+M]) >= L0_threshold:
+                P_noise += 1
+            if np.sum(noise[i*M:i*M+M,j*M:j*M+M]) != 0:
+                B_noise += 1
+
+    print ("Signal %f" % (P_signal/B_signal))
+    print ("Noise %f" % (P_noise/B_noise))
 
     plt.imshow(L0_trigger, cmap=cmap)
     plt.title("L0 trigger", fontsize=15)
