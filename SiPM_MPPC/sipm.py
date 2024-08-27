@@ -58,14 +58,18 @@ def Pulse(Rt, Ft, A, tm, R, plot=False):
 
 
     for i in range (N):
-        if t_pulse[i] < tm:
-            Pulse_shape[i] = A*(1-np.exp(-t_pulse[i]/Rt))
-            B = Pulse_shape[i]
-        else:
-            Pulse_shape[i] = B*np.exp((tm-t_pulse[i])/Ft)
+        # if t_pulse[i] < tm:
+        #     Pulse_shape[i] = A*(1-np.exp(-t_pulse[i]/Rt))
+        #     B = Pulse_shape[i]
+        # else:
+        #     Pulse_shape[i] = B*np.exp((tm-t_pulse[i])/Ft)
+
+        Pulse_shape[i] =(1-np.exp(-t_pulse[i]/Rt))*np.exp((tm-t_pulse[i])/Ft)
+
+    Pulse_shape =  A*Pulse_shape/np.max(Pulse_shape)
             
     if plot== True:
-        plt.figure(figsize=(8, 6))
+        plt.figure(figsize=(6,4))
         plt.plot(t_pulse*1e9, Pulse_shape, 'k')
         plt.xlabel("Time [ns]", horizontalalignment='right', x=1.0, fontsize=15)
         plt.ylabel('Amplitude', horizontalalignment='right', y=1.0, fontsize=15)
@@ -76,7 +80,7 @@ def Pulse(Rt, Ft, A, tm, R, plot=False):
 
         plt.show()
         
-    return Pulse_shape/np.max(Pulse_shape)
+    return Pulse_shape
 
 
 # SiPM (Pixel) simulation
@@ -98,8 +102,8 @@ def Pixel (Pulse_shape, DCR, Pixel_size, Cross,  After, Tau_rec, Tau_AP, W, R,  
     DCR_Cross_After_pulses = np.zeros(L)
     index = 0
 
-
-
+    Nc = 10 # Number of crosstalk pe 
+    
     # Crosstalk
     alpha = 2.2 - 0.02*Cross*100
     
@@ -111,24 +115,11 @@ def Pixel (Pulse_shape, DCR, Pixel_size, Cross,  After, Tau_rec, Tau_AP, W, R,  
 
         if np.random.uniform() < Cross: # Crosstalk probability
             Cross_impulses[index] = 2
-            if np.random.uniform() < Cross: # 3 pe crosstalk
-                if np.random.uniform() < alpha*Cross: # 4 pe crosstalk
-                    if np.random.uniform() < alpha*Cross: # 5 pe crosstalk
-                        if np.random.uniform() < alpha*Cross: # 6 pe crosstalk
-                            if np.random.uniform() < alpha*Cross: # 7 pe crosstalk
-                                if np.random.uniform() < alpha*Cross: # 8 pe crosstalk
-                                    DCR_Cross_After_pulses[index:index+N] = DCR_Cross_After_pulses[index:index+N] + Pulse_shape*np.random.normal(8, sigma)
-                                else:
-                                    DCR_Cross_After_pulses[index:index+N] = DCR_Cross_After_pulses[index:index+N] + Pulse_shape*np.random.normal(7, sigma)
-                            else:
-                                DCR_Cross_After_pulses[index:index+N] = DCR_Cross_After_pulses[index:index+N] + Pulse_shape*np.random.normal(6, sigma)
-                        else : 
-                            DCR_Cross_After_pulses[index:index+N] = DCR_Cross_After_pulses[index:index+N] + Pulse_shape*np.random.normal(5, sigma)
-                    else:
-                        DCR_Cross_After_pulses[index:index+N] = DCR_Cross_After_pulses[index:index+N] + Pulse_shape*np.random.normal(4, sigma)
-                else:
-                    DCR_Cross_After_pulses[index:index+N] = DCR_Cross_After_pulses[index:index+N] + Pulse_shape*np.random.normal(3, sigma)
-
+            if np.random.uniform() < Cross: # > 3 pe crosstalk
+                for n in (np.linspace(1,Nc,Nc)): 
+                    if np.random.uniform() > alpha*Cross:
+                        DCR_Cross_After_pulses[index:index+N] = DCR_Cross_After_pulses[index:index+N] + Pulse_shape*np.random.normal(n+2, sigma)
+                        break
             else: # 2 pe crosstalk
                 DCR_Cross_After_pulses[index:index+N] = DCR_Cross_After_pulses[index:index+N] + Pulse_shape*np.random.normal(2, sigma)
         
@@ -137,9 +128,7 @@ def Pixel (Pulse_shape, DCR, Pixel_size, Cross,  After, Tau_rec, Tau_AP, W, R,  
             DCR_Cross_After_pulses[index:index+N] = DCR_Cross_After_pulses[index:index+N] + Pulse_shape*np.random.normal(1, sigma)
 
         if np.random.uniform() < After: # Afterpulse probability
-            # C = 0
-            # while C > 0.5: # Force the afterpulse amplitude to be greater than 0.5 spe
-            # Rt_after = int(np.random.exponential(scale=Tau_AP, size=None)*1e9/R)
+            
             Rt_after = int(AP_gen(1, Tau_rec, Tau_AP)*1e9/R)
             
             C = 1-np.exp(-(Rt_after*R*1e-9)/Tau_rec)
@@ -198,10 +187,10 @@ def Amplitude_Intertime(Channels, N_pixel, W, R, plot=False):
         
     if plot==True:
         
-        plt.figure(figsize=(8, 6))
+        plt.figure(figsize=(6, 4))
         plt.semilogx(Inter_time, Amplitude, ls=' ', marker='o', color='seagreen', alpha=0.2)
         plt.xlabel("Inter-time [s]", horizontalalignment='right', x=1.0, fontsize=15)
-        plt.ylabel("Amplitude [spe]", horizontalalignment='right', y=1.0, fontsize=15)
+        plt.ylabel("Amplitude [pe]", horizontalalignment='right', y=1.0, fontsize=15)
         plt.xticks(fontsize=15)
         plt.yticks(fontsize=15)
         plt.show()
@@ -211,7 +200,7 @@ def Amplitude_Intertime(Channels, N_pixel, W, R, plot=False):
         X = np.array([left, right]).T.flatten()
         Y = np.array([bins, bins]).T.flatten()
 
-        plt.figure(figsize=(8, 6))
+        plt.figure(figsize=(6, 4))
         plt.loglog(10**X, Y,'b')
         plt.xlabel("Inter-time [s]", horizontalalignment='right', x=1.0, fontsize=15)
         plt.ylabel("Counts", horizontalalignment='right', y=1.0, fontsize=15)
@@ -224,7 +213,7 @@ def Amplitude_Intertime(Channels, N_pixel, W, R, plot=False):
         X = np.array([left, right]).T.flatten()
         Y = np.array([bins, bins]).T.flatten()
 
-        plt.figure(figsize=(8, 6))
+        plt.figure(figsize=(6, 4))
         plt.semilogy(X, Y,'k')
         plt.xlabel("Amplitude [spe]", horizontalalignment='right', x=1.0, fontsize=15)
         plt.ylabel("Counts", horizontalalignment='right', y=1.0, fontsize=15)
