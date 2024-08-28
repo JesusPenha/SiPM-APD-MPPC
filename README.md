@@ -11,6 +11,10 @@ May, 2024
 
 ## Using the SiPM-APD-MPPC module 
 
+The simulation framework is able to generate a single SiPM pulse or pulses generated along a recording window for one or multiple SiPMs. The user also can create analysis plots as peak spectrum histograms, amplitude vs. relative time scatter plots, relative time histograms, and DCR vs. threshold curves.
+
+The scripts **RiCH_example.ipynb** and **IACT_example.ipynb** show application examples of Ring Imaging Cherenkov detectors (RICH) and  Imaging Atmospheric Cherenkov Telescopes (IACT) respectively. Below, you find a general example of the SiPM python module.
+
 ### Signal generation
 
 Single SiPM signal.
