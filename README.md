@@ -9,3 +9,26 @@ May, 2024
 ![imagen](Graphical_abstract.png)
 
 
+## Example 
+
+```python
+
+# Importing the simulation module
+
+import SiPM_MPPC.sipm as sipm
+import matplotlib.pylab as plt
+import numpy as np
+
+# Creating a single sipm pulse
+# Input parameters
+
+Rt = 2e-9 # Rising time in seconds 
+Ft = 50e-9   # Falling time in seconds
+A = 1 # Pulse amplitude (pe) photo-electron
+R = 0.5 # Time step in ns
+
+pulse = sipm.Pulse(Rt, Ft, A, R, plot=True)
+# Output
+# pulse, sipm pulse shape with time step R
+
+```
